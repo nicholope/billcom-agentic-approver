@@ -17,7 +17,7 @@ Acts as an experienced AP manager. Reviews every bill pending in the user's Bill
 Before the first API call, resolve credentials in this order:
 
 1. Check for existing `.env` file at `~/Projects/billcom-ap-priority/.env` and load it.
-2. Fall back to env vars: `BILLCOM_DEV_KEY`, `BILLCOM_USERNAME`, `BILLCOM_PASSWORD`, `BILLCOM_API_TOKEN`, `BILLCOM_ORG_ID`, `BILLCOM_ENVIRONMENT`.
+2. Fall back to env vars: `BILLCOM_DEV_KEY`, `BILLCOM_USERNAME`, `BILLCOM_API_TOKEN`, `BILLCOM_ORG_ID`, `BILLCOM_ENVIRONMENT`.
 3. If any required values are still missing, ask the user once for all missing values.
 4. Derive base URL:
    - `production` → `https://gateway.prod.bill.com/connect`
@@ -33,14 +33,14 @@ Store resolved values in session memory. Never log credentials or print them.
 curl -s -X POST "$BASE_URL/v3/login" \
   -H "Content-Type: application/json" \
   -H "devKey: $BILLCOM_DEV_KEY" \
-  -d "{\"username\":\"$BILLCOM_USERNAME\",\"password\":\"$BILLCOM_PASSWORD\",\"organizationId\":\"$BILLCOM_ORG_ID\"}"
+  -d "{\"username\":\"$BILLCOM_USERNAME\",\"password\":\"$BILLCOM_API_TOKEN\",\"organizationId\":\"$BILLCOM_ORG_ID\"}"
 ```
 
 Extract `sessionId` from response. Sessions expire after 35 min of inactivity — re-auth transparently on any 401.
 
 Use `sessionId` + `devKey` headers on every subsequent request.
 
-> ⚠️ **v2 vs v3:** The existing `.env` has `BILLCOM_API_TOKEN` (used by the v2 API). The v3 login requires `BILLCOM_PASSWORD`. Both are now in `.env`. If v3 login returns 401, surface the error clearly and ask the user to verify their password.
+> ⚠️ **Auth note:** Use `BILLCOM_API_TOKEN` as the `password` field for both v3 login and v2 GL/Class lookup. This is Bill.com’s recommended approach for programmatic access — the API token can be rotated independently of the account password. If login returns 401, verify the token is active in Bill.com → Settings → API.
 
 ---
 
@@ -82,7 +82,7 @@ Captures: `name`, `email`, `address`, `paymentMethod`, `createdTime`.
 The v3 API returns `chartOfAccountId` and `accountingClassId` on line items but does not expose endpoints to resolve them by name. Use the v2 API with the **`data` JSON wrapper pattern**:
 
 ```python
-# Login: use BILLCOM_API_TOKEN as password (not BILLCOM_PASSWORD)
+# Login: use BILLCOM_API_TOKEN as the password field
 login_resp = POST v3/login with password=BILLCOM_API_TOKEN
 sid = login_resp["sessionId"]
 
@@ -198,7 +198,7 @@ Notes can be added at any point — before, after, or instead of a decision. The
    - Use active voice and tight phrasing
    - Preserve all factual content — never drop names, amounts, or specifics
    - Show the rewritten version to the user before saving: `"Rewritten note: {rewritten}"` — proceed automatically without asking for confirmation unless it changes the meaning significantly
-4. **If the note contains any @mention** (e.g. `@AaronEamiguel` or `@Aaron`):
+4. **If the note contains any @mention** (e.g. `@JaneSmith` or `@Jane`):
    - Query `GET $BASE_URL/v3/users?max=100` to fetch all org users
    - Fuzzy-match the mention text against each user's `firstName`, `lastName`, and `firstName + ' ' + lastName`
    - If exactly one match is found: replace the raw @mention with `@{firstName} {lastName}` (correct full name with space)

@@ -175,8 +175,7 @@ See [`examples/console-demo.md`](examples/console-demo.md) for a full annotated 
 |---|---|---|
 | `BILLCOM_DEV_KEY` | Developer API key | Bill.com → Settings → API → Developer Keys |
 | `BILLCOM_USERNAME` | Login email | Your Bill.com login |
-| `BILLCOM_PASSWORD` | Login password | Your Bill.com login |
-| `BILLCOM_API_TOKEN` | API Sync Token | Bill.com → Settings → API → API Token |
+| `BILLCOM_API_TOKEN` | API Sync Token — used as the password field for both v3 and v2 auth | Bill.com → Settings → API → API Token |
 | `BILLCOM_ORG_ID` | Organization ID | Bill.com → Settings → Account → Company |
 | `BILLCOM_ENVIRONMENT` | `production` or `stage` | Choose based on target environment |
 

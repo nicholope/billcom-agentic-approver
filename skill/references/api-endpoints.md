@@ -7,8 +7,7 @@
 ## Env Vars (from ~/Projects/billcom-ap-priority/.env)
 - `BILLCOM_DEV_KEY`
 - `BILLCOM_USERNAME`
-- `BILLCOM_PASSWORD` (v3 login)
-- `BILLCOM_API_TOKEN` (v2 legacy — keep for reference)
+- `BILLCOM_API_TOKEN` — used as the `password` field for both v3 login and v2 GL/Class lookup
 - `BILLCOM_ORG_ID`
 - `BILLCOM_ENVIRONMENT` (`production` | `stage`)
 
@@ -132,7 +131,7 @@ The v3 API returns IDs only for `chartOfAccountId` and `accountingClassId` on li
 
 ### v2 Login (for GL/Class lookup only)
 
-Use `BILLCOM_API_TOKEN` as the password field (not `BILLCOM_PASSWORD`):
+Use `BILLCOM_API_TOKEN` as the `password` field:
 ```json
 POST /v3/login
 { "devKey": "...", "organizationId": "...", "username": "...", "password": "<BILLCOM_API_TOKEN>" }
