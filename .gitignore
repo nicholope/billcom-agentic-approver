@@ -1,0 +1,32 @@
+# Environment & credentials — NEVER commit
+.env
+*.env.*
+!.env.example
+
+# Secrets / keys
+credentials.json
+*.pem
+*.key
+
+# Session cache (runtime only, contains live session IDs)
+/tmp/billcom_*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
