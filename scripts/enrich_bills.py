@@ -9,8 +9,9 @@ flags, and writes results to a JSON file for use by the review session.
 Usage:
     python3 scripts/enrich_bills.py [--output /path/to/output.json] [--max N]
 
-Credentials are loaded from environment variables. The easiest way is:
-    source ~/Projects/billcom-ap-priority/.env && python3 scripts/enrich_bills.py
+Credentials are loaded from a .env file in the project root (one directory
+above this script), or from environment variables already set in the shell.
+Copy .env.example to .env and fill in your values before running.
 
 Required env vars:
     BILLCOM_DEV_KEY       — Developer API key
@@ -30,6 +31,17 @@ import os
 import subprocess
 import sys
 from datetime import date, datetime, timezone
+from pathlib import Path
+
+# Load .env from project root (parent of scripts/) if present.
+# Falls back to env vars already set in the shell.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    # python-dotenv not installed; rely on shell env vars.
+    # Install with: pip install python-dotenv
+    pass
 
 # ---------------------------------------------------------------------------
 # Config

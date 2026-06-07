@@ -35,7 +35,8 @@ This project is an **OpenClaw Skill** — a reusable, installable workflow that 
 ## Features
 
 ### 🔍 Intelligent Bill Review
-- Fetches your live pending approval queue from Bill.com (`GET /v3/bill-approvals/pending-user-approvals`)
+- Fetches your live pending approval queue from Bill.com (filtered by `approvalStatus=ASSIGNED`, sorted newest first)
+- Runs `scripts/enrich_bills.py` upfront to batch-enrich all bills before the review loop starts — faster than per-card API calls, with vendor/history caching for repeat vendors
 - Enriches each bill with full line item detail, vendor profile, and up to 20 bills of payment history
 
 ### 📊 AP Analysis Engine
@@ -112,7 +113,7 @@ User (Telegram / any OpenClaw channel)
 | Endpoint | Purpose |
 |---|---|
 | `POST /v3/login` | Session auth (API token as password) |
-| `GET /v3/bill-approvals/pending-user-approvals` | Fetch approval queue |
+| `GET /v3/bills?filters=approvalStatus:eq:ASSIGNED` | Fetch pending queue (API token workaround — see note below) |
 | `GET /v3/bills/{billId}?billApprovals=true` | Full bill detail |
 | `GET /v3/bills?filters=vendorId:eq:{id}` | Vendor payment history |
 | `GET /v3/vendors/{vendorId}` | Vendor profile |
@@ -122,7 +123,7 @@ User (Telegram / any OpenClaw channel)
 | `POST v2/List/ChartOfAccount.json` | GL account name resolution |
 | `POST v2/List/ActgClass.json` | Accounting class name resolution |
 
-> **Note:** The v3 bill list API returns records under the `results` key, not `bills`. The v2 List API requires auth params as top-level form fields and query params as a JSON-encoded string under the `data` key.
+> **Note:** `GET /v3/bill-approvals/pending-user-approvals` is broken under API token auth — it returns `BDC_1302` (system user entity type mismatch). The workaround is filtering bills by `approvalStatus:eq:ASSIGNED` sorted by `createdTime:desc`. The v3 bill list response uses the `results` key, not `bills`. The v2 List API requires auth params as top-level form fields and query params as a JSON-encoded string under the `data` key.
 
 ---
 
@@ -206,9 +207,13 @@ skill/
   references/
     api-endpoints.md          # Full Bill.com v3/v2 endpoint reference
     analysis-rules.md         # AP flag definitions, thresholds, and edge cases
+scripts/
+  enrich_bills.py             # Batch enrichment script — run before the review loop
+                              # Authenticates, fetches queue, resolves GL/class names,
+                              # builds vendor history, applies analysis flags, outputs JSON
 examples/
   console-demo.md             # Anonymized full session walkthrough
-.env.example                  # Credential template
+.env.example                  # Credential template — copy to .env and fill in values
 .gitignore
 README.md
 ```

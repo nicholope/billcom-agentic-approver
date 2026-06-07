@@ -16,8 +16,8 @@ Acts as an experienced AP manager. Reviews every bill pending in the user's Bill
 
 Before the first API call, resolve credentials in this order:
 
-1. Check for existing `.env` file at `~/Projects/billcom-ap-priority/.env` and load it.
-2. Fall back to env vars: `BILLCOM_DEV_KEY`, `BILLCOM_USERNAME`, `BILLCOM_API_TOKEN`, `BILLCOM_ORG_ID`, `BILLCOM_ENVIRONMENT`.
+1. Check for a `.env` file in the project root. Copy `.env.example` → `.env` and fill in your values if you haven't already.
+2. Fall back to env vars already set in the shell: `BILLCOM_DEV_KEY`, `BILLCOM_USERNAME`, `BILLCOM_API_TOKEN`, `BILLCOM_ORG_ID`, `BILLCOM_ENVIRONMENT`.
 3. If any required values are still missing, ask the user once for all missing values.
 4. Derive base URL:
    - `production` → `https://gateway.prod.bill.com/connect`
@@ -29,10 +29,10 @@ Store resolved values in session memory. Never log credentials or print them.
 
 ## Authentication
 
-> ⚠️ **Critical:** Always load credentials via `source ~/.../billcom-ap-priority/.env` in the shell - do NOT read and copy-paste values. The file may use shell-expanded values that look truncated when read as text.
+> ⚠️ **Critical:** Source your `.env` before running shell commands — do NOT read and copy-paste credential values. Values may appear truncated when read as plain text but are complete when shell-expanded.
 
 ```bash
-source ~/Projects/billcom-ap-priority/.env
+source .env   # from project root; cp .env.example .env if you haven't already
 
 curl -s -X POST "$BASE_URL/v3/login" \
   -H "Content-Type: application/json" \
@@ -76,9 +76,9 @@ Show a summary count first: `"Found N bill(s) pending your approval."`
 > **Preferred:** Run `scripts/enrich_bills.py` for a full batch enrichment before the review loop begins. This is faster than per-card API calls and caches vendor/history data so repeat vendors (e.g. 5 bills from the same supplier) only hit the API once.
 >
 > ```bash
-> source ~/Projects/billcom-ap-priority/.env
 > python3 scripts/enrich_bills.py --output /tmp/billcom_enriched.json
 > ```
+> Credentials are loaded automatically from `.env` in the project root via `python-dotenv`. Install with `pip install python-dotenv` if needed.
 >
 > Then load `/tmp/billcom_enriched.json` for card rendering. Fall back to per-card API calls only if the script is unavailable.
 
