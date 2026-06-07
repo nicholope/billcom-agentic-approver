@@ -29,7 +29,7 @@ Store resolved values in session memory. Never log credentials or print them.
 
 ## Authentication
 
-> ⚠️ **Critical:** Always load credentials via `source ~/.../billcom-ap-priority/.env` in the shell — do NOT read and copy-paste values. The file may use shell-expanded values that look truncated when read as text.
+> ⚠️ **Critical:** Always load credentials via `source ~/.../billcom-ap-priority/.env` in the shell - do NOT read and copy-paste values. The file may use shell-expanded values that look truncated when read as text.
 
 ```bash
 source ~/Projects/billcom-ap-priority/.env
@@ -39,19 +39,19 @@ curl -s -X POST "$BASE_URL/v3/login" \
   -d "{\"username\":\"$BILLCOM_USERNAME\",\"password\":\"$BILLCOM_API_TOKEN\",\"organizationId\":\"$BILLCOM_ORG_ID\",\"devKey\":\"$BILLCOM_DEV_KEY\"}"
 ```
 
-> ⚠️ **devKey goes in the JSON body for `/v3/login`** — NOT as an HTTP header. Passing it as a header returns `{"message": "devKey: must not be null"}`. For all subsequent requests, `devKey` IS passed as a header.
+> ⚠️ **devKey goes in the JSON body for `/v3/login`** - NOT as an HTTP header. Passing it as a header returns `{"message": "devKey: must not be null"}`. For all subsequent requests, `devKey` IS passed as a header.
 
-Extract `sessionId` from response. Sessions expire after 35 min of inactivity — re-auth transparently on any 401.
+Extract `sessionId` from response. Sessions expire after 35 min of inactivity - re-auth transparently on any 401.
 
 Use `sessionId` + `devKey` as **headers** on every subsequent request (non-login endpoints).
 
-> ⚠️ **Auth note:** Use `BILLCOM_API_TOKEN` as the `password` field for both v3 login and v2 GL/Class lookup. This is Bill.com's recommended approach for programmatic access — the API token can be rotated independently of the account password. If login returns 401, verify the token is active in Bill.com → Settings → API.
+> ⚠️ **Auth note:** Use `BILLCOM_API_TOKEN` as the `password` field for both v3 login and v2 GL/Class lookup. This is Bill.com's recommended approach for programmatic access - the API token can be rotated independently of the account password. If login returns 401, verify the token is active in Bill.com → Settings → API.
 
 ---
 
 ## Workflow
 
-### Step 1 — Fetch Pending Queue
+### Step 1 - Fetch Pending Queue
 
 > ⚠️ **`pending-user-approvals` is broken with API token auth.** When authenticated via API token, the session resolves to a system user entity (`syu0...`) rather than a regular user (`006...`). The endpoint rejects system user entity types and returns `BDC_1302`. Use the workaround below instead.
 
@@ -71,7 +71,16 @@ Show a summary count first: `"Found N bill(s) pending your approval."`
 
 ---
 
-### Step 2 - Enrich Each Bill
+### Step 2 — Enrich Each Bill
+
+> **Preferred:** Run `scripts/enrich_bills.py` for a full batch enrichment before the review loop begins. This is faster than per-card API calls and caches vendor/history data so repeat vendors (e.g. 5 bills from the same supplier) only hit the API once.
+>
+> ```bash
+> source ~/Projects/billcom-ap-priority/.env
+> python3 scripts/enrich_bills.py --output /tmp/billcom_enriched.json
+> ```
+>
+> Then load `/tmp/billcom_enriched.json` for card rendering. Fall back to per-card API calls only if the script is unavailable.
 
 For each bill in the queue, fetch:
 
