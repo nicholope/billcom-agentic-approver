@@ -14,14 +14,25 @@ Acts as an experienced AP manager. Reviews every bill pending in the user's Bill
 
 ## Setup — Credentials
 
-Before the first API call, resolve credentials in this order:
+Copy `.env.example` to `.env` in your project directory and fill in your values. Before the first API call, resolve credentials in this order:
 
-1. Check for existing `.env` file at `~/Projects/billcom-ap-priority/.env` and load it.
-2. Fall back to env vars: `BILLCOM_DEV_KEY`, `BILLCOM_USERNAME`, `BILLCOM_PASSWORD`, `BILLCOM_API_TOKEN`, `BILLCOM_ORG_ID`, `BILLCOM_ENVIRONMENT`.
+1. Load `.env` from your project directory.
+2. Fall back to environment variables if no `.env` file is present.
 3. If any required values are still missing, ask the user once for all missing values.
 4. Derive base URL:
    - `production` → `https://gateway.prod.bill.com/connect`
    - `stage`      → `https://gateway.stage.bill.com/connect`
+
+**Required variables:**
+
+| Variable | Description |
+|---|---|
+| `BILLCOM_DEV_KEY` | Your Bill.com developer key (from Developer Portal) |
+| `BILLCOM_USERNAME` | Bill.com login email |
+| `BILLCOM_PASSWORD` | Bill.com account password — used for login (see Auth note below) |
+| `BILLCOM_API_TOKEN` | API token — retained for reference; **not** used for login |
+| `BILLCOM_ORG_ID` | Your organization ID |
+| `BILLCOM_ENVIRONMENT` | `production` or `stage` |
 
 Store resolved values in session memory. Never log credentials or print them.
 
@@ -265,7 +276,7 @@ Omit Annotated Bills section if no notes were added.
 - **401** → re-authenticate silently, retry once. If still failing, tell user.
 - **404** → note "Data unavailable" in card; user can still decide.
 - **429** → wait 5s, retry. If persists, pause and notify user.
-- **Network error** → show error, ask to retry or quit.
+- **Network error** → show error, ask to retry or skip.
 
 ---
 
