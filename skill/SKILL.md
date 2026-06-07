@@ -12,7 +12,7 @@ Acts as an experienced AP manager. Reviews every bill pending in the user's Bill
 
 ---
 
-## Setup — Credentials
+## Setup - Credentials
 
 Before the first API call, resolve credentials in this order:
 
@@ -29,18 +29,23 @@ Store resolved values in session memory. Never log credentials or print them.
 
 ## Authentication
 
+> ⚠️ **Critical:** Always load credentials via `source ~/.../billcom-ap-priority/.env` in the shell — do NOT read and copy-paste values. The file may use shell-expanded values that look truncated when read as text.
+
 ```bash
+source ~/Projects/billcom-ap-priority/.env
+
 curl -s -X POST "$BASE_URL/v3/login" \
   -H "Content-Type: application/json" \
-  -H "devKey: $BILLCOM_DEV_KEY" \
-  -d "{\"username\":\"$BILLCOM_USERNAME\",\"password\":\"$BILLCOM_API_TOKEN\",\"organizationId\":\"$BILLCOM_ORG_ID\"}"
+  -d "{\"username\":\"$BILLCOM_USERNAME\",\"password\":\"$BILLCOM_API_TOKEN\",\"organizationId\":\"$BILLCOM_ORG_ID\",\"devKey\":\"$BILLCOM_DEV_KEY\"}"
 ```
+
+> ⚠️ **devKey goes in the JSON body for `/v3/login`** — NOT as an HTTP header. Passing it as a header returns `{"message": "devKey: must not be null"}`. For all subsequent requests, `devKey` IS passed as a header.
 
 Extract `sessionId` from response. Sessions expire after 35 min of inactivity — re-auth transparently on any 401.
 
-Use `sessionId` + `devKey` headers on every subsequent request.
+Use `sessionId` + `devKey` as **headers** on every subsequent request (non-login endpoints).
 
-> ⚠️ **Auth note:** Use `BILLCOM_API_TOKEN` as the `password` field for both v3 login and v2 GL/Class lookup. This is Bill.com’s recommended approach for programmatic access — the API token can be rotated independently of the account password. If login returns 401, verify the token is active in Bill.com → Settings → API.
+> ⚠️ **Auth note:** Use `BILLCOM_API_TOKEN` as the `password` field for both v3 login and v2 GL/Class lookup. This is Bill.com's recommended approach for programmatic access — the API token can be rotated independently of the account password. If login returns 401, verify the token is active in Bill.com → Settings → API.
 
 ---
 
@@ -48,12 +53,17 @@ Use `sessionId` + `devKey` headers on every subsequent request.
 
 ### Step 1 — Fetch Pending Queue
 
+> ⚠️ **`pending-user-approvals` is broken with API token auth.** When authenticated via API token, the session resolves to a system user entity (`syu0...`) rather than a regular user (`006...`). The endpoint rejects system user entity types and returns `BDC_1302`. Use the workaround below instead.
+
 ```bash
-GET $BASE_URL/v3/bill-approvals/pending-user-approvals
+# Workaround: query bills with ASSIGNED approval status, newest first
+GET $BASE_URL/v3/bills?filters=approvalStatus:eq:ASSIGNED&sort=createdTime:desc&max=20
 Headers: sessionId, devKey
 ```
 
-Response: `{ "bills": [ { "billId", "vendorId", "amount", "dueDate" }, ... ] }`
+Response: `{ "results": [ { "id", "vendorId", "vendorName", "amount", "dueDate", ... } ] }`
+
+> ⚠️ **Do NOT paginate all pages upfront.** Fetching all ASSIGNED bills (which may include hundreds of historical unresolved bills) causes long timeouts. Always fetch the 20 most recent (`sort=createdTime:desc&max=20`) and proceed directly to enrichment.
 
 If the list is empty → tell the user "No bills pending your approval." and stop.
 
@@ -61,7 +71,7 @@ Show a summary count first: `"Found N bill(s) pending your approval."`
 
 ---
 
-### Step 2 — Enrich Each Bill
+### Step 2 - Enrich Each Bill
 
 For each bill in the queue, fetch:
 
@@ -92,13 +102,13 @@ for entity in ["ChartOfAccount", "ActgClass"]:
     form body: devKey=..., sessionId=..., data=json.dumps({"start":0,"max":999})
 ```
 
-> ⚠️ **Critical v2 pattern:** Pass `devKey` and `sessionId` as top-level form fields, and the query params (`start`, `max`, `filters`) as a JSON-encoded string under the `data` key. Do NOT use a `request` wrapper or direct form-encoded integers — both will fail.
+> ⚠️ **Critical v2 pattern:** Pass `devKey` and `sessionId` as top-level form fields, and the query params (`start`, `max`, `filters`) as a JSON-encoded string under the `data` key. Do NOT use a `request` wrapper or direct form-encoded integers - both will fail.
 
 Build two lookup dicts at session start:
 - `coa_map`: `{ chartOfAccountId → name }` (453 entries typical)
 - `cls_map`: `{ accountingClassId → name }` (21 entries typical)
 
-Cache for the full session — do not re-fetch per bill.
+Cache for the full session - do not re-fetch per bill.
 
 **C. Vendor payment history (last 20 bills):**
 ```bash
@@ -110,16 +120,16 @@ Use to build the historical baseline. See `references/analysis-rules.md` for fal
 
 ---
 
-### Step 3 — AP Analysis
+### Step 3 - AP Analysis
 
 Run all flags defined in `references/analysis-rules.md`. Assign severity:
-- 🔴 **HOLD** — duplicate invoice or amount > 200% of trailing average
-- 🟡 **REVIEW** — any other flag
-- 🟢 **CLEAN** — no flags
+- 🔴 **HOLD** - duplicate invoice or amount > 200% of trailing average
+- 🟡 **REVIEW** - any other flag
+- 🟢 **CLEAN** - no flags
 
 ---
 
-### Step 4 — Present Bill Card
+### Step 4 - Present Bill Card
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -131,7 +141,7 @@ Invoice Date: {invoiceDate}
 Due Date:     {dueDate}
 Amount:       ${amount}
 Line Items:
-  • {description | "(no description)"} — ${lineAmount}
+  • {description | "(no description)"} - ${lineAmount}
     GL: {chartOfAccountName}  |  Class: {accountingClassName}
   • ...
 
@@ -139,10 +149,10 @@ Line Items:
   Bills on file: {count}
   Avg amount:    ${avg}
   Max ever:      ${max}
-  Last bill:     {date} — ${lastAmount}
+  Last bill:     {date} - ${lastAmount}
 
 {🟢 CLEAN | 🟡 REVIEW | 🔴 HOLD}
-{Each flag — emoji + plain-English explanation}
+{Each flag - emoji + plain-English explanation}
 
 📝 Notes: {notes added this session, or "(none)"}
 
@@ -161,11 +171,11 @@ Line Items:
 
 ---
 
-### Step 3a — Updating Line Item Descriptions
+### Step 3a - Updating Line Item Descriptions
 
 If a line item has no description or a vague one (VAGUE_LINE_ITEMS flag), the agent may:
 1. Research the vendor's service offerings if needed (web search) to understand what the charge covers
-2. Rewrite the description clearly and concisely for an executive audience — preserving all service names and specifics
+2. Rewrite the description clearly and concisely for an executive audience - preserving all service names and specifics
 3. Patch the bill before presenting the card:
 
 ```bash
@@ -186,24 +196,24 @@ Show the updated description in the bill card. The VAGUE_LINE_ITEMS flag may be 
 
 ---
 
-### Step 4a — [N] Notes
+### Step 4a - [N] Notes
 
-Notes can be added at any point — before, after, or instead of a decision. They are never destructive on their own.
+Notes can be added at any point - before, after, or instead of a decision. They are never destructive on their own.
 
 1. User types `n` or `note`
-2. Prompt: `"Add note for {vendorName} ${amount} — type your note:"`
+2. Prompt: `"Add note for {vendorName} ${amount} - type your note:"`
 3. **Always rewrite the note** for clarity and concision before saving. The audience is executive-level. Rules:
    - Fix grammar, spelling, and capitalization
    - Remove filler words and redundancy
    - Use active voice and tight phrasing
-   - Preserve all factual content — never drop names, amounts, or specifics
-   - Show the rewritten version to the user before saving: `"Rewritten note: {rewritten}"` — proceed automatically without asking for confirmation unless it changes the meaning significantly
+   - Preserve all factual content - never drop names, amounts, or specifics
+   - Show the rewritten version to the user before saving: `"Rewritten note: {rewritten}"` - proceed automatically without asking for confirmation unless it changes the meaning significantly
 4. **If the note contains any @mention** (e.g. `@JaneSmith` or `@Jane`):
    - Query `GET $BASE_URL/v3/users?max=100` to fetch all org users
    - Fuzzy-match the mention text against each user's `firstName`, `lastName`, and `firstName + ' ' + lastName`
    - If exactly one match is found: replace the raw @mention with `@{firstName} {lastName}` (correct full name with space)
    - If multiple matches: list them and ask the user to clarify
-   - If no match: warn `"Could not find a Bill.com user matching '{mention}' — note will be saved as-is"`
+   - If no match: warn `"Could not find a Bill.com user matching '{mention}' - note will be saved as-is"`
 4. Store the resolved note in session memory keyed by `billId`
 5. Redisplay card with note under `📝 Notes:`
 6. Re-present decision menu
@@ -217,7 +227,7 @@ Notes can be added at any point — before, after, or instead of a decision. The
 
 ---
 
-### Step 5 — Execute Decision
+### Step 5 - Execute Decision
 
 **Approve:**
 ```bash
@@ -237,7 +247,7 @@ On API error: show the error clearly, ask user to retry or skip.
 
 ---
 
-### Step 6 — Session Summary
+### Step 6 - Session Summary
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -249,7 +259,7 @@ Denied:   N  ($total)
 Skipped:  N
 
 📝 Annotated Bills:
-  • {vendorName} ${amount} — "{note}"
+  • {vendorName} ${amount} - "{note}"
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -269,7 +279,7 @@ Omit Annotated Bills section if no notes were added.
 ## AP Manager Principles
 
 - Be direct. Flag issues clearly; don't bury them.
-- Never approve on behalf of the user — always wait for explicit input.
+- Never approve on behalf of the user - always wait for explicit input.
 - For ambiguous flags (round numbers, retainers), add context.
-- THIN_HISTORY is advisory — state the sample size.
+- THIN_HISTORY is advisory - state the sample size.
 - HOLD flags are serious until the user explicitly overrides them.

@@ -16,27 +16,34 @@
 ## Auth
 
 ### POST /v3/login
-Headers: `devKey`  
-Body: `{ username, password, organizationId }`  
-Response: `{ sessionId, userId, organizationId, ... }`  
+
+> ⚠️ **`devKey` must be in the JSON body for this endpoint** — NOT as an HTTP header. Passing it as a header returns `{"message": "devKey: must not be null"}`. All other endpoints use `devKey` as a header.
+
+Always load credentials via `source ~/Projects/billcom-ap-priority/.env` in the shell. Do NOT read/copy-paste credential values — the file may use shell-interpolated values that appear truncated when read as plain text.
+
+Body: `{ username, password, organizationId, devKey }`  
+Response: `{ sessionId, userId, organizationId, trusted, ... }`  
 TTL: 35 min inactivity. Re-auth on 401.
+
+> ⚠️ **`trusted: false`** in the login response indicates API token auth. This is normal and expected — it does not restrict bill read/approve/deny access, but it does break the `pending-user-approvals` endpoint (see below).
 
 ---
 
 ## Bills
 
 ### GET /v3/bill-approvals/pending-user-approvals
-Returns bills pending approval for the signed-in user.  
-Required roles: Administrator, Accountant, Approver.
 
-Response:
-```json
-{
-  "bills": [
-    { "billId": "00n...", "vendorId": "009...", "amount": 1500.00, "dueDate": "2026-12-31" }
-  ]
-}
+> ❌ **Broken with API token auth.** When using an API token, the session resolves to a system user entity (`syu0...`) instead of a regular user (`006...`). This endpoint validates entity type and returns `BDC_1302: The entity type of id syu0... does not match any of the expected entity types: User.`
+
+**Use this workaround instead:**
+
 ```
+GET /v3/bills?filters=approvalStatus:eq:ASSIGNED&sort=createdTime:desc&max=20
+```
+
+Returns the 20 most recently created ASSIGNED (pending approval) bills. The `ASSIGNED` approval status is the correct filter value — `PENDING`, `PENDING_APPROVAL`, and `NEEDS_APPROVAL` are all unsupported filter values and return a 400 error.
+
+> ⚠️ Do NOT paginate all pages upfront to count totals. The ASSIGNED bucket may contain hundreds of old unresolved bills. Always fetch the 20 newest (`sort=createdTime:desc`) and start enrichment immediately.
 
 ### GET /v3/bills/{billId}?billApprovals=true
 Full bill detail.
